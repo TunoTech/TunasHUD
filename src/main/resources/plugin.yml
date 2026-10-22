@@ -1,0 +1,14 @@
+
+name: TunasHUD
+version: '1.1.1'
+main: com.tunashud.TunasHUD
+api-version: '26.3'
+description: A lightweight, server-side compass and biome HUD.
+author: Tuna
+load: POSTWORLD
+
+commands:
+  hud:
+    description: Show or hide your compass HUD.
+    usage: /hud help
+    aliases: [tunashud]
