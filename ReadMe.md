@@ -1,3 +1,4 @@
+<img width="389" height="61" alt="Screenshot 2026-10-21 162002" src="https://github.com/user-attachments/assets/5cd7c507-5d56-4ea6-9b1b-173ea4594f69" />
 # TunasHUD
 
 ## Description
