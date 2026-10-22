@@ -1,10 +1,9 @@
-
 name: TunasHUD
-version: '1.1.1'
+version: '1.0.0'
 main: com.tunashud.TunasHUD
 api-version: '26.3'
 description: A lightweight, server-side compass and biome HUD.
-author: Tuna
+author: TunoTech
 load: POSTWORLD
 
 commands:
