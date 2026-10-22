@@ -2,7 +2,7 @@
 
 ## Description
 
-TunasHUD is a lightweight, 100% server-side Minecraft Paper plugin that provides a scrolling compass and player biome information without requiring client-side mods or resource packs.
+TunasHUD is a lightweight, 100% server-side Minecraft Paper plugin that provides a scrolling compass and player biome information without requiring client-side mods or resource packs.  It's very simple, straight to the point.  100% made with the help of AI.  
 
 **Features:**
 - Real-time scrolling compass displayed at the top of the screen.
