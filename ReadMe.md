@@ -1,4 +1,7 @@
-<img width="389" height="61" alt="Screenshot 2026-10-21 162002" src="https://github.com/user-attachments/assets/5cd7c507-5d56-4ea6-9b1b-173ea4594f69" />
+<img width="739" height="81" alt="Screenshot 2026-10-21 162002" src="https://github.com/user-attachments/assets/5cd7c507-5d56-4ea6-9b1b-173ea4594f69" />
+<img width="739" height="81" alt="Screenshot 2026-10-22 143215" src="https://github.com/user-attachments/assets/6a5c1caf-49b6-4cb1-a79e-27f64de95d02" />
+
+
 
 
 # TunasHUD
