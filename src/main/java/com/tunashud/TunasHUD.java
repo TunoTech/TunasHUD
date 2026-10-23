@@ -1,9 +1,13 @@
 
 package com.tunashud;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
+import org.bukkit.Location;
 import org.bukkit.block.Biome;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
@@ -39,14 +43,18 @@ public final class TunasHUD extends JavaPlugin
     private static final int TOTAL_CELLS = 32;
     private static final int MAX_PIXEL_WIDTH = 172;
 
+    private static final char HOME_MARKER = '⌂';
+
     private final Map<UUID, BossBar> compassBars = new HashMap<>();
     private final Map<UUID, String> lastTitles = new HashMap<>();
     private final Map<UUID, Boolean> enabledSettings = new HashMap<>();
 
-    // Remember Tab names so they can be restored.
     private final Map<UUID, String> originalTabNames = new HashMap<>();
     private final Map<UUID, String> lastBiomeNames = new HashMap<>();
     private final Map<UUID, String> hudTabNames = new HashMap<>();
+
+    private final Map<UUID, Component> originalTabHeaders = new HashMap<>();
+    private final Map<UUID, Component> originalTabFooters = new HashMap<>();
 
     private long tickCounter = 0;
 
@@ -64,18 +72,22 @@ public final class TunasHUD extends JavaPlugin
                 updateCompass(player);
             }
 
-            // Update Tab-list biomes every two seconds.
             if (tickCounter % 40 == 0) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     updateTabBiome(player);
                 }
             }
 
+            if (tickCounter % 20 == 0) {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    updateTabClock(player);
+                }
+            }
         }, 0L, 1L);
 
-        // Support players already online during a plugin reload.
         for (Player player : Bukkit.getOnlinePlayers()) {
             updateTabBiome(player);
+            updateTabClock(player);
         }
 
         getLogger().info("TunasHUD " +
@@ -94,16 +106,22 @@ public final class TunasHUD extends JavaPlugin
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             restoreTabName(player);
+            restoreTabHeader(player);
         }
 
         originalTabNames.clear();
         lastBiomeNames.clear();
         hudTabNames.clear();
+        originalTabHeaders.clear();
+        originalTabFooters.clear();
     }
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        updateTabBiome(event.getPlayer());
+        Player player = event.getPlayer();
+
+        updateTabBiome(player);
+        updateTabClock(player);
     }
 
     @EventHandler
@@ -115,10 +133,13 @@ public final class TunasHUD extends JavaPlugin
         enabledSettings.remove(id);
 
         restoreTabName(player);
+        restoreTabHeader(player);
 
         originalTabNames.remove(id);
         lastBiomeNames.remove(id);
         hudTabNames.remove(id);
+        originalTabHeaders.remove(id);
+        originalTabFooters.remove(id);
     }
 
     private void removeCompass(UUID id) {
@@ -158,7 +179,7 @@ public final class TunasHUD extends JavaPlugin
             return newBar;
         });
 
-        String newTitle = buildCompass(player.getLocation().getYaw());
+        String newTitle = buildCompass(player);
 
         if (!newTitle.equals(lastTitles.get(id))) {
             bar.setTitle(newTitle);
@@ -169,8 +190,9 @@ public final class TunasHUD extends JavaPlugin
     private void updateTabBiome(Player player) {
         UUID id = player.getUniqueId();
 
-        // Save the player's existing Tab name before modifying it.
-        originalTabNames.putIfAbsent(id, player.getPlayerListName());
+        originalTabNames.putIfAbsent(
+                id, player.getPlayerListName()
+        );
 
         Biome biome = player.getLocation().getBlock().getBiome();
         NamespacedKey key = Registry.BIOME.getKey(biome);
@@ -203,12 +225,82 @@ public final class TunasHUD extends JavaPlugin
         String original = originalTabNames.get(id);
         String applied = hudTabNames.get(id);
 
-        // Only restore if our plugin still owns the displayed name.
         if (original != null
                 && applied != null
                 && applied.equals(player.getPlayerListName())) {
 
             player.setPlayerListName(original);
+        }
+    }
+
+    private void updateTabClock(Player player) {
+        UUID id = player.getUniqueId();
+
+        originalTabHeaders.putIfAbsent(
+                id, player.playerListHeader()
+        );
+
+        originalTabFooters.putIfAbsent(
+                id, player.playerListFooter()
+        );
+
+        long time = player.getWorld().getTime();
+
+        long totalMinutes =
+                ((time + 6000L) % 24000L) * 1440L / 24000L;
+
+        long hours = totalMinutes / 60L;
+        long minutes = totalMinutes % 60L;
+
+        String formattedTime = String.format(
+                Locale.ROOT,
+                "%02d:%02d",
+                hours,
+                minutes
+        );
+
+        boolean isDay = time < 12000L;
+
+        String symbol = isDay ? "☀" : "☾";
+
+        NamedTextColor symbolColor = isDay
+                ? NamedTextColor.YELLOW
+                : NamedTextColor.AQUA;
+
+        Component header = Component.text("TunasHUD")
+                .color(NamedTextColor.GOLD)
+                .append(Component.newline())
+                .append(Component.text(symbol + " ", symbolColor))
+                .append(Component.text(
+                        formattedTime,
+                        NamedTextColor.WHITE
+                ));
+
+        Component originalFooter = originalTabFooters.get(id);
+
+        player.sendPlayerListHeaderAndFooter(
+                header,
+                originalFooter != null
+                        ? originalFooter
+                        : Component.empty()
+        );
+    }
+
+    private void restoreTabHeader(Player player) {
+        UUID id = player.getUniqueId();
+
+        Component originalHeader = originalTabHeaders.get(id);
+        Component originalFooter = originalTabFooters.get(id);
+
+        if (originalHeader != null || originalFooter != null) {
+            player.sendPlayerListHeaderAndFooter(
+                    originalHeader != null
+                            ? originalHeader
+                            : Component.empty(),
+                    originalFooter != null
+                            ? originalFooter
+                            : Component.empty()
+            );
         }
     }
 
@@ -238,10 +330,100 @@ public final class TunasHUD extends JavaPlugin
         return result.toString();
     }
 
-    // Compass rendering preserved from v1.0.11.
-    private String buildCompass(float yaw) {
+    // Minecraft yaw: south=0, west=90, north=180, east=270.
+    private double normalizeHeading(double yaw) {
+        return ((yaw + 180.0) % 360.0 + 360.0) % 360.0;
+    }
 
-        double heading = ((yaw + 180.0) % 360.0 + 360.0) % 360.0;
+    // Calculate the compass bearing toward the player's bed.
+    // Returns null if there is no bed spawn or it is in another world.
+    private Double getBedBearing(Player player) {
+        Location bed = player.getBedSpawnLocation();
+
+        if (bed == null) {
+            return null;
+        }
+
+        Location current = player.getLocation();
+
+        if (!current.getWorld().equals(bed.getWorld())) {
+            return null;
+        }
+
+        double dx = bed.getX() - current.getX();
+        double dz = bed.getZ() - current.getZ();
+
+        // No useful horizontal direction when already at the bed.
+        if (dx * dx + dz * dz < 0.01) {
+            return null;
+        }
+
+        double yawToBed = Math.toDegrees(Math.atan2(-dx, dz));
+
+        return normalizeHeading(yawToBed);
+    }
+
+    // Add the house by replacing an existing dot.
+    // This never inserts or removes compass characters.
+    private int findHomeDot(
+            String visibleTape,
+            int start,
+            double heading,
+            double bedBearing
+    ) {
+        double centerPosition =
+                8.0 * CELL_WIDTH
+                        + (heading / 45.0) * CELL_WIDTH;
+
+        double targetPosition =
+                8.0 * CELL_WIDTH
+                        + (bedBearing / 45.0) * CELL_WIDTH;
+
+        double revolutionWidth = DIRECTIONS.length * CELL_WIDTH;
+
+        // Choose the copy of the compass bearing closest
+        // to the current viewing direction.
+        while (targetPosition - centerPosition > revolutionWidth / 2.0) {
+            targetPosition -= revolutionWidth;
+        }
+
+        while (centerPosition - targetPosition > revolutionWidth / 2.0) {
+            targetPosition += revolutionWidth;
+        }
+
+        int nearestIndex = -1;
+        double nearestDistance = Double.MAX_VALUE;
+
+        for (int i = 0; i < visibleTape.length(); i++) {
+            if (visibleTape.charAt(i) != '·') {
+                continue;
+            }
+
+            double absolutePosition = start + i;
+            double distance = Math.abs(
+                    absolutePosition - targetPosition
+            );
+
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = i;
+            }
+        }
+
+        // The target must actually be within the displayed tape.
+        // Allow a small offset to reach the nearest dot.
+        if (nearestDistance > 4.0) {
+            return -1;
+        }
+
+        return nearestIndex;
+    }
+
+    // Original compass geometry preserved, with a bed marker added.
+    private String buildCompass(Player player) {
+        float yaw = player.getLocation().getYaw();
+
+        double heading = normalizeHeading(yaw);
 
         int activeIndex = (int) Math.floor(
                 (heading + 22.5) / 45.0
@@ -260,7 +442,8 @@ public final class TunasHUD extends JavaPlugin
 
             for (int dot = 1; dot <= DOT_COUNT; dot++) {
                 int position = (int) Math.round(
-                        (double) dot * availableSpace / (DOT_COUNT + 1)
+                        (double) dot * availableSpace
+                                / (DOT_COUNT + 1)
                 );
 
                 if (position >= 0 && position < availableSpace) {
@@ -291,6 +474,20 @@ public final class TunasHUD extends JavaPlugin
             start++;
         }
 
+        // New in v1.1.3: replace the closest visible dot
+        // with a green marker pointing toward the bed.
+        int homeDotIndex = -1;
+        Double bedBearing = getBedBearing(player);
+
+        if (bedBearing != null) {
+            homeDotIndex = findHomeDot(
+                    visibleTape,
+                    start,
+                    heading,
+                    bedBearing
+            );
+        }
+
         String activeLabel = DIRECTIONS[activeIndex];
         int activeCell = 8 + activeIndex;
 
@@ -300,21 +497,35 @@ public final class TunasHUD extends JavaPlugin
 
         int activePosition = activeCell * CELL_WIDTH - start;
 
-        if (activePosition >= 0
-                && activePosition + activeLabel.length()
-                <= visibleTape.length()) {
+        // Build color formatting without changing tape positions.
+        StringBuilder result = new StringBuilder("§f");
 
-            return "§f"
-                    + visibleTape.substring(0, activePosition)
-                    + "§e"
-                    + activeLabel
-                    + "§f"
-                    + visibleTape.substring(
-                    activePosition + activeLabel.length()
-            );
+        for (int i = 0; i < visibleTape.length(); i++) {
+
+            if (i == homeDotIndex) {
+                result.append("§a");
+                result.append(HOME_MARKER);
+                result.append("§f");
+                continue;
+            }
+
+            if (i == activePosition
+                    && activePosition >= 0
+                    && activePosition + activeLabel.length()
+                    <= visibleTape.length()) {
+
+                result.append("§e");
+                result.append(activeLabel);
+                result.append("§f");
+
+                i += activeLabel.length() - 1;
+                continue;
+            }
+
+            result.append(visibleTape.charAt(i));
         }
 
-        return "§f" + visibleTape;
+        return result.toString();
     }
 
     private int estimateWidth(String text) {
@@ -377,7 +588,8 @@ public final class TunasHUD extends JavaPlugin
         player.sendMessage("§e/hud on §7- Show compass");
         player.sendMessage("§e/hud off §7- Hide compass");
         player.sendMessage("§e/hud help §7- Show this help");
-        player.sendMessage("§7Hold Tab to view player biomes.");
+        player.sendMessage("§7Hold Tab to view player biomes and time.");
+        player.sendMessage("§7Green house marker points toward your bed spawn.");
         player.sendMessage("§7Compass settings reset on disconnect.");
     }
 
